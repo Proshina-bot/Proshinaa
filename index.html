@@ -6,11 +6,9 @@
     <title>Шиномонтаж PRO-шина · Онлайн запись</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
-    <!-- ========== ВСТАВЬТЕ СЮДА ВАШ URL ИЗ APP SCRIPT ========== -->
-    <script>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPzre5dMKVPUCuG74DnC-tvqVv3KVtXrMQXr4eyLcH3f85V7oXK1jszZbhzU5ZnTdJ/exec';</script>
-    <!-- ======================================================== -->
+    
+    <!-- Стили (те же, что и раньше) -->
     <style>
-        /* --- СТИЛИ ПОЛНОСТЬЮ ИЗ ПРЕДЫДУЩЕЙ ВЕРСИИ --- */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background: #dbe7ec; padding: 15px; display: flex; justify-content: center; }
         .container { max-width: 1800px; width: 100%; background: white; border-radius: 40px; box-shadow: 0 20px 40px -10px #1a414f; padding: 20px 25px; }
@@ -247,6 +245,16 @@
     (function() {
         flatpickr.localize(flatpickr.l10ns.ru);
 
+        // ========== ВАЖНО: ВСТАВЬТЕ ВАШ URL ==========
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPzre5dMKVPUCuG74DnC-tvqVv3KVtXrMQXr4eyLcH3f85V7oXK1jszZbhzU5ZnTdJ/exec';
+        // =============================================
+
+        // --- Скрытый iframe для отправки данных без перезагрузки ---
+        const iframe = document.createElement('iframe');
+        iframe.name = 'submitFrame';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
         // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
         function formatPhone(value) {
             const digits = value.replace(/\D/g, '');
@@ -445,7 +453,7 @@
             defaultDate: new Date(),
             locale: 'ru',
             onChange: function(selectedDates, dateStr) { 
-                renderSlotsForDate(dateStr); 
+                loadOccupiedFromServer(); // Загружаем данные при смене даты
                 clearSelection(); 
                 document.body.classList.remove('move-mode');
             }
@@ -466,11 +474,10 @@
             }
         });
 
-        // --- ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ С СЕРВЕРА ---
+        // --- ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ ---
         async function loadOccupiedFromServer() {
             showStatus('🔄 Загрузка данных...', 'info');
             try {
-                // Добавляем timestamp для избежания кэширования
                 const response = await fetch(APPS_SCRIPT_URL + '?t=' + new Date().getTime());
                 if (!response.ok) throw new Error('Ошибка сети');
                 const data = await response.json();
@@ -485,39 +492,55 @@
             if (datePicker.value) renderSlotsForDate(datePicker.value);
         }
 
-        // --- ФУНКЦИЯ ОТПРАВКИ НА СЕРВЕР ---
-        async function sendToServer(action, data) {
-            showStatus('⏳ Отправка...', 'info');
-            try {
-                const response = await fetch(APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'cors', // Меняем на cors вместо no-cors
-                    headers: { 
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ action, ...data })
-                });
+        // --- ОТПРАВКА ДАННЫХ БЕЗ ПЕРЕЗАГРУЗКИ СТРАНИЦЫ ---
+        function sendToServer(action, data) {
+            return new Promise((resolve) => {
+                showStatus('⏳ Отправка...', 'info');
                 
-                if (!response.ok) throw new Error('Ошибка сети');
+                // Создаем временную форму
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = APPS_SCRIPT_URL;
+                form.target = 'submitFrame';
+                form.style.display = 'none';
                 
-                const result = await response.json();
+                // Добавляем все данные
+                const fullData = { action, ...data };
                 
-                if (result.success) {
-                    showStatus('✅ ' + result.message, 'success');
-                    // Перезагружаем данные для синхронизации
-                    await loadOccupiedFromServer();
-                } else {
-                    showStatus('❌ ' + (result.error || 'Ошибка'), 'error');
-                    // Откатываем оптимистичное обновление
-                    await loadOccupiedFromServer();
+                for (let key in fullData) {
+                    if (fullData[key] !== undefined && fullData[key] !== null) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = String(fullData[key]);
+                        form.appendChild(input);
+                    }
                 }
                 
-            } catch (error) {
-                console.error('Ошибка отправки:', error);
-                showStatus('❌ Ошибка соединения', 'error');
-                // Откатываем оптимистичное обновление
-                await loadOccupiedFromServer();
-            }
+                // Обработчик загрузки iframe
+                const onLoad = () => {
+                    iframe.removeEventListener('load', onLoad);
+                    showStatus('✅ Данные отправлены', 'success');
+                    
+                    // Перезагружаем данные через небольшую задержку
+                    setTimeout(() => {
+                        loadOccupiedFromServer();
+                    }, 1000);
+                    
+                    resolve();
+                };
+                
+                iframe.addEventListener('load', onLoad);
+                
+                // Отправляем форму
+                document.body.appendChild(form);
+                form.submit();
+                
+                // Удаляем форму после отправки
+                setTimeout(() => {
+                    document.body.removeChild(form);
+                }, 1000);
+            });
         }
 
         // --- ФУНКЦИЯ ОТРИСОВКИ СЛОТОВ ---
@@ -607,7 +630,6 @@
                                     // Режим переноса
                                     if (occupiedSlots[moveSourceKey]) {
                                         const sourceData = occupiedSlots[moveSourceKey];
-                                        const newData = { ...sourceData, branch: currentBranch };
                                         
                                         // Отправляем на сервер
                                         sendToServer('move', {
@@ -627,7 +649,7 @@
                                         });
                                         
                                         // Оптимистичное обновление
-                                        occupiedSlots[slotKey] = newData;
+                                        occupiedSlots[slotKey] = { ...sourceData, branch: currentBranch };
                                         delete occupiedSlots[moveSourceKey];
                                         renderSlotsForDate(dateStr);
                                         exitMoveMode();
@@ -697,7 +719,7 @@
                 comment: commentInput.value.trim()
             });
 
-            // Сброс
+            // Сброс формы
             clientNameInput.value = ''; 
             carBrandInput.value = ''; 
             phoneInput.value = ''; 
