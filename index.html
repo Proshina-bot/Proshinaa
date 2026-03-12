@@ -125,12 +125,10 @@
     </div>
 
     <div class="main-grid">
-        <!-- СЕТКА ВРЕМЕНИ -->
         <div class="slots-panel">
             <div class="time-columns" id="timeSlotsContainer"></div>
         </div>
 
-        <!-- ФОРМА ЗАПИСИ -->
         <div class="entry-panel">
             <h3 style="font-size:1.4rem;">📝 Новая запись</h3>
             <div class="selected-box">
@@ -312,7 +310,7 @@
 
         // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
         const CARS = ['1', '2', '3'];
-        let occupiedSlots = {}; // Здесь хранятся данные с сервера
+        let occupiedSlots = {};
         let currentSelection = { date: null, time: null, carIndex: null, carLabel: null, slotKey: null };
         let selectedServices = [];
         let selectedSize = '';
@@ -468,11 +466,12 @@
             }
         });
 
-        // --- ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ С СЕРВЕРА (GET) ---
+        // --- ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ С СЕРВЕРА ---
         async function loadOccupiedFromServer() {
             showStatus('🔄 Загрузка данных...', 'info');
             try {
-                const response = await fetch(APPS_SCRIPT_URL + '?t=' + new Date().getTime()); // Кэш-бастер
+                // Добавляем timestamp для избежания кэширования
+                const response = await fetch(APPS_SCRIPT_URL + '?t=' + new Date().getTime());
                 if (!response.ok) throw new Error('Ошибка сети');
                 const data = await response.json();
                 occupiedSlots = data;
@@ -480,34 +479,44 @@
             } catch (error) {
                 console.error('Ошибка загрузки:', error);
                 showStatus('❌ Ошибка загрузки данных', 'error');
-                occupiedSlots = {}; // Пустой объект при ошибке
+                occupiedSlots = {};
             }
             
             if (datePicker.value) renderSlotsForDate(datePicker.value);
         }
 
-        // --- ФУНКЦИЯ ОТПРАВКИ НА СЕРВЕР (POST) ---
+        // --- ФУНКЦИЯ ОТПРАВКИ НА СЕРВЕР ---
         async function sendToServer(action, data) {
             showStatus('⏳ Отправка...', 'info');
             try {
                 const response = await fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // Важно для работы с Apps Script
-                    headers: { 'Content-Type': 'application/json' },
+                    mode: 'cors', // Меняем на cors вместо no-cors
+                    headers: { 
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({ action, ...data })
                 });
                 
-                // При no-cors мы не можем прочитать ответ
-                showStatus('✅ Данные отправлены', 'success');
+                if (!response.ok) throw new Error('Ошибка сети');
                 
-                // Перезагружаем данные через секунду
-                setTimeout(async () => {
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus('✅ ' + result.message, 'success');
+                    // Перезагружаем данные для синхронизации
                     await loadOccupiedFromServer();
-                }, 1000);
+                } else {
+                    showStatus('❌ ' + (result.error || 'Ошибка'), 'error');
+                    // Откатываем оптимистичное обновление
+                    await loadOccupiedFromServer();
+                }
                 
             } catch (error) {
                 console.error('Ошибка отправки:', error);
                 showStatus('❌ Ошибка соединения', 'error');
+                // Откатываем оптимистичное обновление
+                await loadOccupiedFromServer();
             }
         }
 
@@ -599,8 +608,6 @@
                                     if (occupiedSlots[moveSourceKey]) {
                                         const sourceData = occupiedSlots[moveSourceKey];
                                         const newData = { ...sourceData, branch: currentBranch };
-                                        occupiedSlots[slotKey] = newData;
-                                        delete occupiedSlots[moveSourceKey];
                                         
                                         // Отправляем на сервер
                                         sendToServer('move', {
@@ -619,9 +626,11 @@
                                             extraComment: sourceData.extraComment || ''
                                         });
                                         
+                                        // Оптимистичное обновление
+                                        occupiedSlots[slotKey] = newData;
+                                        delete occupiedSlots[moveSourceKey];
                                         renderSlotsForDate(dateStr);
                                         exitMoveMode();
-                                        showStatus('✅ Запись перенесена', 'success');
                                     } else {
                                         showStatus('❌ Исходная запись не найдена', 'error');
                                         exitMoveMode();
@@ -709,7 +718,6 @@
                     slotKey: currentDetailSlotKey, 
                     extraComment: extraCommentField.value 
                 });
-                alert('✅ Комментарий сохранён');
             }
         });
 
