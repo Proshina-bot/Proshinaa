@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Шиномонтаж PRO-шина · ФИНАЛ</title>
+    <title>Шиномонтаж PRO-шина · ИСПРАВЛЕНО</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
     <style>
@@ -100,7 +100,7 @@
 <div class="container">
     <h1>
         Шиномонтаж PRO-шина
-        <small>ФИНАЛ</small>
+        <small>ИСПРАВЛЕНО</small>
     </h1>
     <div class="work-schedule">
         <span>📅 Будни: 9:00 – 21:00</span>
@@ -249,7 +249,7 @@
         flatpickr.localize(flatpickr.l10ns.ru);
 
         // ========== ВАШ URL ==========
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwyY9QvhmTupQ3lAmGgvHuO8xiWeNt8s95nJgyN_2Zy5rwGkKd83-VUA_WMXkm14_fj/exec';
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZoE2gZFInoAaW3qzM2kfErdZxGEIgXeBZ2D4lR3H-Zy0CKqIWJKBfOCGKTBDvbrVc/exec';
         // =============================
 
         // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
@@ -519,6 +519,29 @@
             }
         }
 
+        // --- ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ ---
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            // Пробуем распарсить дату
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '—';
+            const d = new Date(timeStr);
+            if (isNaN(d.getTime())) return timeStr;
+            
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
         // --- ОТРИСОВКА СЛОТОВ ---
         function renderSlotsForDate(dateStr) {
             if (!dateStr) return;
@@ -590,8 +613,8 @@
                                 const data = occupiedSlots[slotKey];
                                 detailInfoDiv.innerHTML = `
                                     <div class="detail-row"><span class="detail-label">Филиал:</span><span>${data.branch === 'ryabinina' ? 'Рябинина' : 'Аммундсена'}</span></div>
-                                    <div class="detail-row"><span class="detail-label">Дата:</span><span>${dateStr}</span></div>
-                                    <div class="detail-row"><span class="detail-label">Время:</span><span>${time}</span></div>
+                                    <div class="detail-row"><span class="detail-label">Дата:</span><span>${formatDate(dateStr)}</span></div>
+                                    <div class="detail-row"><span class="detail-label">Время:</span><span>${formatTime(time)}</span></div>
                                     <div class="detail-row"><span class="detail-label">Услуги:</span><span>${data.services ? data.services.join(', ') : ''} ${data.size || ''}</span></div>
                                     <div class="detail-row"><span class="detail-label">Марка:</span><span>${data.carBrand || '—'}</span></div>
                                     <div class="detail-row"><span class="detail-label">Имя:</span><span>${data.clientName || '—'}</span></div>
@@ -643,7 +666,7 @@
             freeSlotsSpan.textContent = `🟢 ${freeCount} свободно`;
         }
 
-        // --- ЖУРНАЛ ---
+        // --- ЖУРНАЛ (ИСПРАВЛЕННЫЙ) ---
         function renderJournal() {
             try {
                 const search = journalSearch.value.toLowerCase() || '';
@@ -673,10 +696,14 @@
                 journalCardsDiv.innerHTML = entries.length ? '' : '<div style="padding:40px; text-align:center;">✖️ Нет записей</div>';
                 
                 entries.forEach(e => {
+                    // Форматируем дату и время для отображения
+                    const displayDate = formatDate(e.date);
+                    const displayTime = formatTime(e.time);
+                    
                     const card = document.createElement('div');
                     card.className = 'record-card';
                     card.innerHTML = `
-                        <div><strong>🏢 ${e.branch === 'ryabinina' ? 'Рябинина' : 'Аммундсена'} | 📅 ${e.date} ⏰ ${e.time}</strong></div>
+                        <div><strong>🏢 ${e.branch === 'ryabinina' ? 'Рябинина' : 'Аммундсена'} | 📅 ${displayDate} ⏰ ${displayTime}</strong></div>
                         <div>🔧 ${e.services ? e.services.join(', ') : ''} ${e.size || ''}</div>
                         <div>👤 ${e.clientName || '—'}</div>
                         <div>🚗 ${e.carBrand || '—'}</div>
@@ -698,14 +725,14 @@
                         const targetBranchBtn = document.querySelector(`.branch-btn[data-branch="${branch}"]`);
                         if (targetBranchBtn) targetBranchBtn.click();
                         
-                        datePicker.value = date;
+                        datePicker.value = formatDate(date);
                         loadOccupiedFromServer();
                         journalModal.classList.remove('show');
                         
                         setTimeout(() => {
                             const slots = document.querySelectorAll('.car-slot.occupied');
                             slots.forEach(slot => {
-                                if (slot.dataset.time === time && slot.dataset.car === car) {
+                                if (slot.dataset.time === formatTime(time) && slot.dataset.car === car) {
                                     slot.style.background = '#ffd9b3';
                                     setTimeout(() => {
                                         slot.style.background = '';
