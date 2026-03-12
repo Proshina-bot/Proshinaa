@@ -6,11 +6,11 @@
     <title>Шиномонтаж PRO-шина · Онлайн запись</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
-    <!-- ========== ВАЖНО: ВСТАВЬТЕ СЮДА ВАШ URL ИЗ APP SCRIPT ========== -->
+    <!-- ========== ВСТАВЬТЕ СЮДА ВАШ URL ИЗ APP SCRIPT ========== -->
     <script>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPzre5dMKVPUCuG74DnC-tvqVv3KVtXrMQXr4eyLcH3f85V7oXK1jszZbhzU5ZnTdJ/exec';</script>
-    <!-- ================================================================= -->
+    <!-- ======================================================== -->
     <style>
-        /* --- СТИЛИ ПОЛНОСТЬЮ ИЗ ПРЕДЫДУЩЕЙ ВЕРСИИ (60px слоты) --- */
+        /* --- СТИЛИ ПОЛНОСТЬЮ ИЗ ПРЕДЫДУЩЕЙ ВЕРСИИ --- */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', sans-serif; background: #dbe7ec; padding: 15px; display: flex; justify-content: center; }
         .container { max-width: 1800px; width: 100%; background: white; border-radius: 40px; box-shadow: 0 20px 40px -10px #1a414f; padding: 20px 25px; }
@@ -312,13 +312,13 @@
 
         // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
         const CARS = ['1', '2', '3'];
-        let occupiedSlots = {}; // Здесь хранятся данные, загруженные с сервера
+        let occupiedSlots = {}; // Здесь хранятся данные с сервера
         let currentSelection = { date: null, time: null, carIndex: null, carLabel: null, slotKey: null };
         let selectedServices = [];
         let selectedSize = '';
         let currentBranch = 'ryabinina';
-        let moveSourceKey = null; // Для переноса
-        let currentDetailSlotKey = null; // Для детального окна
+        let moveSourceKey = null;
+        let currentDetailSlotKey = null;
 
         // --- DOM ЭЛЕМЕНТЫ ---
         const datePicker = document.getElementById('datePicker');
@@ -336,7 +336,7 @@
         const sizeBtns = document.querySelectorAll('.size-btn');
         const branchBtns = document.querySelectorAll('.branch-btn');
 
-        // --- МОДАЛЬНЫЕ ОКНА (элементы) ---
+        // --- МОДАЛЬНЫЕ ОКНА ---
         const journalModal = document.getElementById('journalModal');
         const openJournalBtn = document.getElementById('openJournalBtn');
         const closeJournalBtn = document.getElementById('closeJournalBtn');
@@ -356,7 +356,7 @@
         const extraCommentField = document.getElementById('extraCommentField');
         const saveExtraCommentBtn = document.getElementById('saveExtraCommentBtn');
 
-        // --- ФУНКЦИИ ДЛЯ РАБОТЫ С UI ---
+        // --- ФУНКЦИИ UI ---
         function updateServicesDisplay() {
             if (selectedServices.length === 0) {
                 selectedServicesDisplay.textContent = '✓ Выбрано: —';
@@ -386,7 +386,7 @@
             setTimeout(() => statusDiv.style.display = 'none', 3000);
         }
 
-        // --- ОБРАБОТЧИКИ НА КНОПКИ ---
+        // --- ОБРАБОТЧИКИ ---
         serviceBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 const service = this.dataset.service;
@@ -435,14 +435,13 @@
             });
         });
 
-        // Скрываем спец. услуги при загрузке
         serviceBtns.forEach(btn => {
             if (btn.dataset.special === 'true') {
                 btn.style.display = 'none';
             }
         });
 
-        // --- КАЛЕНДАРИ (flatpickr) ---
+        // --- КАЛЕНДАРИ ---
         flatpickr(datePicker, {
             dateFormat: "Y-m-d",
             defaultDate: new Date(),
@@ -469,47 +468,47 @@
             }
         });
 
-        // --- ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ С СЕРВЕРА ---
+        // --- ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ С СЕРВЕРА (GET) ---
         async function loadOccupiedFromServer() {
-            // Для демонстрации, пока грузим из localStorage.
-            // В реальности нужно заменить на fetch(APPS_SCRIPT_URL + '?action=getAll') и парсить ответ.
             showStatus('🔄 Загрузка данных...', 'info');
-            const stored = localStorage.getItem('tire_online_final');
-            if (stored) { 
-                try { occupiedSlots = JSON.parse(stored); } catch { occupiedSlots = {}; } 
-            } else {
-                // Демо-данные
-                const today = new Date().toISOString().slice(0,10);
-                occupiedSlots = {
-                    [`ryabinina_${today}_09:00_1`]: { services: ['Комплекс'], size: 'R17', carBrand: 'KIA', phone: '+7 (916) 123-45-67', comment: 'запаска', clientName: 'Игорь', extraComment: '', branch: 'ryabinina' },
-                    [`ryabinina_${today}_09:30_2`]: { services: ['СУ+Баланс'], size: 'R18', carBrand: 'MAZDA', phone: '+7 (495) 222-33-44', comment: 'кроссовер', clientName: 'Марина', extraComment: '', branch: 'ryabinina' },
-                    [`ammundsena_${today}_10:00_3`]: { services: ['Слесарка', 'Кондиционер'], size: 'R16', carBrand: 'FORD', phone: '+7 (903) 111-22-33', comment: 'заправка кондиционера', clientName: 'Пётр', extraComment: '', branch: 'ammundsena' },
-                };
-                saveOccupiedToServer(); // Сохраним демо в хранилище
+            try {
+                const response = await fetch(APPS_SCRIPT_URL + '?t=' + new Date().getTime()); // Кэш-бастер
+                if (!response.ok) throw new Error('Ошибка сети');
+                const data = await response.json();
+                occupiedSlots = data;
+                showStatus('✅ Данные загружены', 'success');
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+                showStatus('❌ Ошибка загрузки данных', 'error');
+                occupiedSlots = {}; // Пустой объект при ошибке
             }
+            
             if (datePicker.value) renderSlotsForDate(datePicker.value);
-            return occupiedSlots;
         }
 
-        // --- ФУНКЦИЯ ОТПРАВКИ НА СЕРВЕР (И ЛОКАЛЬНОЕ СОХРАНЕНИЕ ДЛЯ ТЕСТА) ---
-        async function saveOccupiedToServer(action = 'sync', data = {}) {
-            // Для демонстрации используем localStorage
-            localStorage.setItem('tire_online_final', JSON.stringify(occupiedSlots));
-            showStatus('✅ Данные сохранены (локально)', 'success');
-            // В реальности здесь был бы fetch с action
-            /*
+        // --- ФУНКЦИЯ ОТПРАВКИ НА СЕРВЕР (POST) ---
+        async function sendToServer(action, data) {
+            showStatus('⏳ Отправка...', 'info');
             try {
                 const response = await fetch(APPS_SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
+                    mode: 'no-cors', // Важно для работы с Apps Script
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action, ...data })
                 });
-                showStatus('✅ Операция выполнена', 'success');
+                
+                // При no-cors мы не можем прочитать ответ
+                showStatus('✅ Данные отправлены', 'success');
+                
+                // Перезагружаем данные через секунду
+                setTimeout(async () => {
+                    await loadOccupiedFromServer();
+                }, 1000);
+                
             } catch (error) {
+                console.error('Ошибка отправки:', error);
                 showStatus('❌ Ошибка соединения', 'error');
             }
-            */
         }
 
         // --- ФУНКЦИЯ ОТРИСОВКИ СЛОТОВ ---
@@ -596,11 +595,30 @@
                             slotDiv.innerHTML = `<span class="slot-empty">ПУСТО</span>`;
                             slotDiv.addEventListener('click', () => {
                                 if (document.body.classList.contains('move-mode') && moveSourceKey) {
-                                    // Перенос
+                                    // Режим переноса
                                     if (occupiedSlots[moveSourceKey]) {
-                                        occupiedSlots[slotKey] = { ...occupiedSlots[moveSourceKey], branch: currentBranch };
+                                        const sourceData = occupiedSlots[moveSourceKey];
+                                        const newData = { ...sourceData, branch: currentBranch };
+                                        occupiedSlots[slotKey] = newData;
                                         delete occupiedSlots[moveSourceKey];
-                                        saveOccupiedToServer('move', { oldSlotKey: moveSourceKey, newSlotKey: slotKey, ...occupiedSlots[slotKey] });
+                                        
+                                        // Отправляем на сервер
+                                        sendToServer('move', {
+                                            oldSlotKey: moveSourceKey,
+                                            newSlotKey: slotKey,
+                                            newBranch: currentBranch,
+                                            newDate: dateStr,
+                                            newTime: time,
+                                            newCar: car,
+                                            services: sourceData.services.join(','),
+                                            size: sourceData.size,
+                                            carBrand: sourceData.carBrand,
+                                            clientName: sourceData.clientName,
+                                            phone: sourceData.phone,
+                                            comment: sourceData.comment,
+                                            extraComment: sourceData.extraComment || ''
+                                        });
+                                        
                                         renderSlotsForDate(dateStr);
                                         exitMoveMode();
                                         showStatus('✅ Запись перенесена', 'success');
@@ -641,12 +659,14 @@
             const newSlotKey = currentSelection.slotKey;
             if (occupiedSlots[newSlotKey]) return showStatus('❌ Слот занят', 'error');
 
+            const clientName = capitalizeName(clientNameInput.value.trim());
+
             // Оптимистичное обновление
             occupiedSlots[newSlotKey] = {
                 services: [...selectedServices],
                 size: selectedSize,
                 carBrand: carBrand,
-                clientName: capitalizeName(clientNameInput.value.trim()),
+                clientName: clientName,
                 phone: phoneInput.value.trim(),
                 comment: commentInput.value.trim(),
                 extraComment: '',
@@ -654,25 +674,41 @@
             };
             renderSlotsForDate(date);
 
-            // Сохраняем
-            await saveOccupiedToServer('new', {
-                branch: currentBranch, date, time: currentSelection.time, car: currentSelection.carLabel,
-                services: selectedServices.join(','), size: selectedSize, carBrand,
-                clientName: clientNameInput.value.trim(), phone: phoneInput.value.trim(), comment: commentInput.value.trim()
+            // Отправка на сервер
+            await sendToServer('new', {
+                branch: currentBranch,
+                date: date,
+                time: currentSelection.time,
+                car: currentSelection.carLabel,
+                services: selectedServices.join(','),
+                size: selectedSize,
+                carBrand: carBrand,
+                clientName: clientName,
+                phone: phoneInput.value.trim(),
+                comment: commentInput.value.trim()
             });
 
             // Сброс
-            clientNameInput.value = ''; carBrandInput.value = ''; phoneInput.value = ''; commentInput.value = '';
+            clientNameInput.value = ''; 
+            carBrandInput.value = ''; 
+            phoneInput.value = ''; 
+            commentInput.value = '';
             serviceBtns.forEach(b => b.classList.remove('selected'));
             sizeBtns.forEach(b => b.classList.remove('selected'));
-            selectedServices = []; updateServicesDisplay(); selectedSize = ''; clearSelection();
+            selectedServices = []; 
+            updateServicesDisplay(); 
+            selectedSize = ''; 
+            clearSelection();
         });
 
         // --- СОХРАНЕНИЕ ДОП. КОММЕНТАРИЯ ---
         saveExtraCommentBtn.addEventListener('click', () => {
             if (currentDetailSlotKey && occupiedSlots[currentDetailSlotKey]) {
                 occupiedSlots[currentDetailSlotKey].extraComment = extraCommentField.value;
-                saveOccupiedToServer('saveExtraComment', { slotKey: currentDetailSlotKey, extraComment: extraCommentField.value });
+                sendToServer('saveExtraComment', { 
+                    slotKey: currentDetailSlotKey, 
+                    extraComment: extraCommentField.value 
+                });
                 alert('✅ Комментарий сохранён');
             }
         });
@@ -763,7 +799,7 @@
                     const key = e.target.dataset.slotkey;
                     if (key && confirm('Удалить?')) {
                         delete occupiedSlots[key];
-                        saveOccupiedToServer('delete', { slotKey: key });
+                        sendToServer('delete', { slotKey: key });
                         renderJournal();
                         if (datePicker.value) renderSlotsForDate(datePicker.value);
                         clearSelection();
@@ -779,7 +815,7 @@
         deleteFromDetailBtn.addEventListener('click', () => {
             if (currentDetailSlotKey && confirm('Удалить эту запись?')) {
                 delete occupiedSlots[currentDetailSlotKey];
-                saveOccupiedToServer('delete', { slotKey: currentDetailSlotKey });
+                sendToServer('delete', { slotKey: currentDetailSlotKey });
                 renderJournal();
                 if (datePicker.value) renderSlotsForDate(datePicker.value);
                 detailModal.classList.remove('show');
